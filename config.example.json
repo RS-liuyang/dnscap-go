@@ -1,0 +1,9 @@
+{
+  "Pcap_Path": "/Users/liuyang/GoglandProjects/dnscap-go/",
+  "Pcap_Patten": "*.pcap",
+  "Log_Path": "/tmp",
+  "MaxLogSize": 100,
+  "MaxBackups": 200,
+  "LinkType": 101,
+  "ReqCacheSize": 100
+}

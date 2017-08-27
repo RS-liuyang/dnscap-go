@@ -45,13 +45,13 @@ func (rC *reqCache) Init(size int){
 	rC.lruCache, _ = lru.New(size)
 }
 
-func (rC *reqCache)addRequest(srcIP net.IP, dstIP net.IP, srcPort uint16, dstPort uint16, queryID uint16, qtype uint16, qName string){
+func (rC *reqCache)addRequest(srcIP net.IP, dstIP net.IP, srcPort uint16, dstPort uint16, queryID uint16, qtype uint16, qName string, tinenow time.Time){
 
 	//fmt.Printf("%s,%s,%d,%d,%d\n", srcIP, dstIP, srcPort, dstPort, queryID)
 
 	//fmt.Printf("cache lenth: %d\n", rC.lruCache.Len())
 	reqE := reqElementKey{ip2int(srcIP), ip2int(dstIP), srcPort, dstPort, queryID}
-	reqV := reqElementValue{time.Now(), qtype, qName}
+	reqV := reqElementValue{tinenow, qtype, qName}
 
 	rC.lruCache.Add(reqE, reqV)
 }
