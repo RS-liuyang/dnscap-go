@@ -8,6 +8,8 @@ import (
 	"encoding/binary"
 )
 
+var slabNumber uint16 = 8
+
 type reqElementKey struct {
 	srcIP		uint32;
 	dstIP		uint32;
@@ -38,11 +40,15 @@ func int2ip(nn uint32) net.IP {
 
 
 type reqCache struct {
-	lruCache *lru.Cache
+	lruCache []*lru.Cache
 }
 
 func (rC *reqCache) Init(size int){
-	rC.lruCache, _ = lru.New(size)
+	for i:=0; i<(int)(slabNumber); i++{
+		lc, _ := lru.New(size)
+		rC.lruCache = append(rC.lruCache, lc)
+	}
+	//rC.lruCache, _ = lru.New(size)
 }
 
 func (rC *reqCache)addRequest(srcIP net.IP, dstIP net.IP, srcPort uint16, dstPort uint16, queryID uint16, qtype uint16, qName string, tinenow time.Time){
@@ -53,7 +59,7 @@ func (rC *reqCache)addRequest(srcIP net.IP, dstIP net.IP, srcPort uint16, dstPor
 	reqE := reqElementKey{ip2int(srcIP), ip2int(dstIP), srcPort, dstPort, queryID}
 	reqV := reqElementValue{tinenow, qtype, qName}
 
-	rC.lruCache.Add(reqE, reqV)
+	rC.lruCache[queryID&(slabNumber-1)].Add(reqE, reqV)
 }
 
 
@@ -61,7 +67,7 @@ func (rc *reqCache)findRequest(srcIP net.IP, dstIP net.IP, srcPort uint16, dstPo
 
 	reqE := reqElementKey{ip2int(dstIP), ip2int(srcIP), dstPort, srcPort, queryID}
 
-	reqV, _ := rc.lruCache.Peek(reqE)
+	reqV, _ := rc.lruCache[queryID&(slabNumber-1)].Peek(reqE)
 
 	if(reqV == nil){
 		return nil

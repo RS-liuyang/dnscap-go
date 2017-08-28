@@ -11,11 +11,13 @@ import (
 	dns "github.com/miekg/dns"
 	"runtime"
 	"strings"
-	"gopkg.in/natefinch/lumberjack.v2"
+	"github.com/RS-liuyang/rotate-log"
 	_ "io/ioutil"
 	"path/filepath"
 	"github.com/hashicorp/golang-lru"
 	"sort"
+	gdq "github.com/Workiva/go-datastructures/queue"
+	"fmt"
 )
 
 var (
@@ -47,7 +49,7 @@ var (
 	configFileName	string
 	pcapLinkType	int = -1
 
-
+	logbuffer	*gdq.RingBuffer
 )
 
 type Worker struct{
@@ -68,6 +70,8 @@ func (w Worker) Start() {
 			w.WorkerPoll <- w.PacketChannel
 			select {
 			case packet := <-w.PacketChannel:
+				//debug
+				//continue
 				analysis_packet(packet)
 			case <-w.quit:
 				return
@@ -140,7 +144,7 @@ func analysis_packet(packet gopacket.Packet) {
 
 		if panicked != nil {
 			log.Printf("%v\n", panicked)
-			log.Printf("cache size is %d\n", requestCache.lruCache.Len())
+			//log.Printf("cache size is %d\n", requestCache.lruCache.Len())
 		}
 	}()
 
@@ -189,7 +193,17 @@ func analysis_packet(packet gopacket.Packet) {
 				duration = (float32)(timenow.UnixNano() - req_time.UnixNano())/1000000
 			}
 
+			//debug
+			//return
+			logbuffer.Put(fmt.Sprintf("%s|%d|%s|%d|%s|%s|%s|%s|%s|%.4f\n", ip.DstIP.String(), udp.DstPort,
+				ip.SrcIP.String(), udp.SrcPort,
+				dns.RcodeToString[msg.Rcode],
+				dns.Type(msg.Question[0].Qtype).String(),
+				msg.Question[0].Name,
+				AnswerString(msg),
+				timenow.Format("20060102150405.000"), duration))
 
+/*
 			dnsLog.Printf("%s|%d|%s|%d|%s|%s|%s|%s|%s|%.4f\n", ip.DstIP.String(), udp.DstPort,
 				ip.SrcIP.String(), udp.SrcPort,
 				dns.RcodeToString[msg.Rcode],
@@ -197,7 +211,8 @@ func analysis_packet(packet gopacket.Packet) {
 				msg.Question[0].Name,
 				AnswerString(msg),
 				timenow.Format("20060102150405.000"), duration)
-			//fmt.Println("get response")
+*/
+
 		}else{
 			//a request info should saved into LRU cache
 			requestCache.addRequest(ip.SrcIP, ip.DstIP, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id, msg.Question[0].Qtype, msg.Question[0].Name, timenow)
@@ -249,13 +264,22 @@ func main() {
 
 	WorkerPoll = make(chan chan gopacket.Packet, maxWorkers)
 
+	if(processorNumber+2 > runtime.NumCPU()){
+		processorNumber = runtime.NumCPU()
+	}else{
+		processorNumber +=2
+	}
 	runtime.GOMAXPROCS(processorNumber)
 
 	requestCache.Init(requestCacheSize)
 
 	finishedFiles, _ = lru.New(10000)
 
+	logbuffer = gdq.NewRingBuffer(10000)
+
 	var dnsFileName = dnsLogPath + "/dnscap.log"
+	/*
+
 	dnsLog = log.New(&lumberjack.Logger{
 		Filename:   dnsFileName,
 		MaxSize:    dnsLogSize, // megabytes after which new file is created
@@ -264,12 +288,31 @@ func main() {
 		LocalTime:	true,
 	}, "", log.Ldate|log.Ltime)
 
+
 	dnsLog.SetFlags(0)
+	*/
 
 	for i:=0; i<maxWorkers;i++ {
 		worker:=newWorker(WorkerPoll)
 		worker.Start()
 	}
+
+	go func(){
+		dnsLog2 := lumberjack.Logger{
+			Filename:   dnsFileName,
+			MaxSize:    dnsLogSize, // megabytes after which new file is created
+			MaxBackups: dnsLogMaxBak, // number of backups
+			MaxAge:     0, //days
+			LocalTime:	true,
+		}
+
+		for{
+			s , _:=logbuffer.Get()
+			b :=[]byte(s.(string))
+			dnsLog2.Write(b)
+			//dnsLog.Print(s)
+		}
+	}()
 
 	if(sourceDir != "") {
 		go getFilesPeriod()
@@ -300,10 +343,14 @@ func main() {
 	// Use the handle as a packet source to process all packets
 	//packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	packetSource := gopacket.NewPacketSource(handle, layers.LinkTypeRaw)
+	packetSource.DecodeOptions.Lazy = true
+	packetSource.DecodeOptions.NoCopy = true
+
 	for packet := range packetSource.Packets() {
 		//analysis_packet(packet)
 		//go func(packet gopacket.Packet){
 		//	analysis_packet(packet)
+
 		packetChannel := <-WorkerPoll
 		packetChannel <- packet
 		//}(packet)
@@ -328,6 +375,9 @@ func dealPcap(pcapFile string) {
 	}else{
 		packetSource = gopacket.NewPacketSource(handle, (layers.LinkType)(pcapLinkType))
 	}
+
+	packetSource.DecodeOptions.Lazy = true
+	packetSource.DecodeOptions.NoCopy = true
 
 	for packet := range packetSource.Packets() {
 
