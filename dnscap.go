@@ -116,6 +116,11 @@ func DealFile() {
 
 func RRString(rr dns.RR) string{
 
+	if rr.Header().Rrtype == dns.TypeA || rr.Header().Rrtype == dns.TypeAAAA {
+		
+	}else{
+		return ""
+	}
 	retString := dns.Type(rr.Header().Rrtype).String() + "_"
 
 	ss := strings.Split(rr.String(), "\t")
@@ -126,11 +131,17 @@ func RRString(rr dns.RR) string{
 
 func AnswerString(msg *dns.Msg)string {
 	retString := ""
-	for index, rr := range msg.Answer{
-		if index > 0 {
+	for _, rr := range msg.Answer{
+	//for index, rr := range msg.Answer{
+		//if index > 0 {
+		s_rr := RRString(rr)
+		if len(s_rr) == 0{
+			continue
+		}
+		if len(retString)>0 {
 			retString += ";"
 		}
-		retString += RRString(rr)
+		retString += s_rr //RRString(rr)
 	}
 	return retString
 }
@@ -188,6 +199,8 @@ func analysis_packet(packet gopacket.Packet) {
 			var duration float32
 
 			if(req_time == nil){
+				tmp_time := timenow.Add(time.Duration(-100)*time.Millisecond)
+				req_time = &tmp_time
 				duration = 100
 			}else{
 				duration = (float32)(timenow.UnixNano() - req_time.UnixNano())/1000000
@@ -195,13 +208,19 @@ func analysis_packet(packet gopacket.Packet) {
 
 			//debug
 			//return
-			logbuffer.Put(fmt.Sprintf("%s|%d|%s|%d|%s|%s|%s|%s|%s|%.4f\n", ip.DstIP.String(), udp.DstPort,
-				ip.SrcIP.String(), udp.SrcPort,
-				dns.RcodeToString[msg.Rcode],
+			logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|%.3f\n",
+				ip.DstIP.String(),
+				ip.SrcIP.String(),
+				req_time.Format("20060102150405.000000"),
+				timenow.Format("20060102150405.000000"),
+				//strings.TrimSuffix(msg.Question[0].Name, "."),
+				msg.Question[0].Name[0:len(msg.Question[0].Name)-1],
 				dns.Type(msg.Question[0].Qtype).String(),
-				msg.Question[0].Name,
+				msg.Id,
+				udp.DstPort,
+				msg.Rcode,
 				AnswerString(msg),
-				timenow.Format("20060102150405.000"), duration))
+				duration))
 
 /*
 			dnsLog.Printf("%s|%d|%s|%d|%s|%s|%s|%s|%s|%.4f\n", ip.DstIP.String(), udp.DstPort,
