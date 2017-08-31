@@ -4,13 +4,13 @@ import (
 	"time"
 	"flag"
 	"log"
-	_ "fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 	layers "github.com/google/gopacket/layers"
 	dns "github.com/miekg/dns"
 	"runtime"
 	"strings"
+	//"gopkg.in/RS-liuyang/rotate-log.v2"
 	"github.com/RS-liuyang/rotate-log"
 	_ "io/ioutil"
 	"path/filepath"
@@ -117,7 +117,7 @@ func DealFile() {
 func RRString(rr dns.RR) string{
 
 	if rr.Header().Rrtype == dns.TypeA || rr.Header().Rrtype == dns.TypeAAAA {
-		
+
 	}else{
 		return ""
 	}
