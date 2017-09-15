@@ -15,6 +15,7 @@ type Config struct {
 	MaxBackups		int
 	LinkType		int
 	ReqCacheSize	int
+	Pcap_topath		string
 }
 
 func newConfig(configFile string) *Config{

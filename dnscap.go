@@ -18,6 +18,7 @@ import (
 	"sort"
 	gdq "github.com/Workiva/go-datastructures/queue"
 	"fmt"
+        "os"
 )
 
 var (
@@ -45,6 +46,7 @@ var (
 	sourceDir	string
 	sourceFilePattern		string = "*.pcap"
 	sourceFiles []string
+	sourcetoDir	string
 
 	configFileName	string
 	pcapLinkType	int = -1
@@ -111,6 +113,13 @@ func DealFile() {
 	for{
 		filename := <-pcapFiles
 		dealPcap(filename)
+
+                listpattern := strings.Split(filename, "/")
+                lastpattern := listpattern[len(listpattern)-1]
+		//fmt.Printf("%s is last filename\n", lastpattern)
+	        filenewname := sourcetoDir + lastpattern
+		//fmt.Printf("%s move to %s\n", filename, filenewname)
+		os.Rename(filename, filenewname)
 	}
 }
 
@@ -264,6 +273,7 @@ func main() {
 		dnsLogPath = config.Log_Path
 		dnsLogSize = config.MaxLogSize
 		dnsLogMaxBak = config.MaxBackups
+		sourcetoDir = config.Pcap_topath
 		if(config.LinkType != 0){
 			pcapLinkType = config.LinkType
 		}
@@ -278,6 +288,7 @@ func main() {
 		log.Printf("dns log file max backup number: %d\n", dnsLogMaxBak)
 		log.Printf("predefined pcap linktype: %d\n", pcapLinkType)
 		log.Printf("request cache size: %d\n", requestCacheSize)
+		log.Printf("Pcap move to directoy: %s\n", sourcetoDir)
 	}
 
 

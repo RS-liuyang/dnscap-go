@@ -5,5 +5,6 @@
   "MaxLogSize": 100,
   "MaxBackups": 200,
   "LinkType": 101,
-  "ReqCacheSize": 100
+  "ReqCacheSize": 100,
+  "Pcap_toPath": "/Users/liuyang/GoglandProjects/dnscap-go/bjbak/"
 }
