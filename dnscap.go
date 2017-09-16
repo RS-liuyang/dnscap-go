@@ -395,6 +395,7 @@ func dealPcap(pcapFile string) {
 		finishedFiles.Remove(pcapFile)
 		return
 	}
+	defer handle.Close()
 
 	log.Println("processing pcap file ", pcapFile)
 
