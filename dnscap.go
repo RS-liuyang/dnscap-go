@@ -130,10 +130,11 @@ func RRString(rr dns.RR) string{
 	}else{
 		return ""
 	}
-	retString := dns.Type(rr.Header().Rrtype).String() + "_"
+	//retString := dns.Type(rr.Header().Rrtype).String() + "_"
 
 	ss := strings.Split(rr.String(), "\t")
-	retString += ss[len(ss)-1]
+	//retString += ss[len(ss)-1]
+	retString := ss[len(ss)-1]
 
 	return retString
 }
@@ -205,31 +206,53 @@ func analysis_packet(packet gopacket.Packet) {
 		if msg.Response {
 			//find request info and logout
 			req_time := requestCache.findRequest(ip.SrcIP, ip.DstIP, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id)
-			var duration float32
+			//var duration float32
+			var duration int
 
 			if(req_time == nil){
 				tmp_time := timenow.Add(time.Duration(-100)*time.Millisecond)
 				req_time = &tmp_time
 				duration = 100
 			}else{
-				duration = (float32)(timenow.UnixNano() - req_time.UnixNano())/1000000
+				//duration = (float32)(timenow.UnixNano() - req_time.UnixNano())/1000000
+				duration = (int)(timenow.UnixNano() - req_time.UnixNano())/1000000
 			}
 
 			//debug
 			//return
-			logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|%.3f\n",
-				ip.DstIP.String(),
-				ip.SrcIP.String(),
-				req_time.Format("20060102150405.000000"),
-				timenow.Format("20060102150405.000000"),
-				//strings.TrimSuffix(msg.Question[0].Name, "."),
-				msg.Question[0].Name[0:len(msg.Question[0].Name)-1],
-				dns.Type(msg.Question[0].Qtype).String(),
-				msg.Id,
-				udp.DstPort,
-				msg.Rcode,
-				AnswerString(msg),
-				duration))
+			if(duration == 100){
+				logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|100\n",
+					ip.DstIP.String(),
+					ip.SrcIP.String(),
+					//req_time.Format("20060102150405.000000"),
+					//timenow.Format("20060102150405.000000"),
+					req_time.Format("20060102150405.000"),
+					timenow.Format("20060102150405.000"),
+					//strings.TrimSuffix(msg.Question[0].Name, "."),
+					msg.Question[0].Name[0:len(msg.Question[0].Name)-1],
+					dns.Type(msg.Question[0].Qtype).String(),
+					msg.Id,
+					udp.DstPort,
+					msg.Rcode,
+					AnswerString(msg)))
+			}else{
+				//logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|%.3f\n",
+				logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|%d\n",
+					ip.DstIP.String(),
+					ip.SrcIP.String(),
+					//req_time.Format("20060102150405.000000"),
+					//timenow.Format("20060102150405.000000"),
+					req_time.Format("20060102150405.000"),
+					timenow.Format("20060102150405.000"),
+					//strings.TrimSuffix(msg.Question[0].Name, "."),
+					msg.Question[0].Name[0:len(msg.Question[0].Name)-1],
+					dns.Type(msg.Question[0].Qtype).String(),
+					msg.Id,
+					udp.DstPort,
+					msg.Rcode,
+					AnswerString(msg),
+					duration))
+			}
 
 /*
 			dnsLog.Printf("%s|%d|%s|%d|%s|%s|%s|%s|%s|%.4f\n", ip.DstIP.String(), udp.DstPort,
