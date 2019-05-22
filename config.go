@@ -14,7 +14,7 @@ type Config struct {
 	MaxLogSize		int
 	MaxBackups		int
 	LinkType		int
-	//ReqCacheSize	int
+	ReqCacheSize	int
 	Pcap_topath		string
 }
 

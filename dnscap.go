@@ -19,6 +19,7 @@ import (
 	gdq "github.com/Workiva/go-datastructures/queue"
 	"fmt"
         "os"
+	"net"
 )
 
 var (
@@ -34,6 +35,7 @@ var (
 	maxWorkers	int
 	WorkerPoll	chan chan gopacket.Packet
 	requestCache	reqCache
+	requestCache6	reqCache6
 	requestCacheSize	int = 100 * 10000
 	dnsLog		*log.Logger
 	dnsLogPath	string
@@ -170,6 +172,8 @@ func analysis_packet(packet gopacket.Packet) {
 	}()
 
 	var timenow time.Time
+	var isv6 bool = false
+	var srcip, dstip net.IP
 
 	if(packet.Metadata() == nil){
 		timenow = time.Now()
@@ -179,14 +183,24 @@ func analysis_packet(packet gopacket.Packet) {
 
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
-		log.Println("ip layer missing")
-		return
+		iplayer := packet.Layer(layers.LayerTypeIPv6)
+		if iplayer == nil {
+			log.Println("ip layer missing")
+			return
+		}
+		ip, _ := iplayer.(*layers.IPv6)
+		srcip = ip.SrcIP
+		dstip = ip.DstIP
+		isv6 = true
+	}else {
+		ip, _ := ipLayer.(*layers.IPv4)
+		srcip = ip.SrcIP
+		dstip = ip.DstIP
 	}
 
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer != nil {
 		//fmt.Println("UDP layers detected")
-		ip := ipLayer.(*layers.IPv4)
 		udp := udpLayer.(*layers.UDP)
 		//fmt.Printf("From port %d to %d\n", udp.SrcPort, udp.DstPort)
 		//fmt.Println(udp.Payload)
@@ -205,7 +219,12 @@ func analysis_packet(packet gopacket.Packet) {
 
 		if msg.Response {
 			//find request info and logout
-			req_time := requestCache.findRequest(ip.SrcIP, ip.DstIP, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id)
+			var req_time *time.Time
+			if isv6 {
+				req_time = requestCache6.findRequest6(srcip, dstip, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id)
+			}else {
+				req_time = requestCache.findRequest(srcip, dstip, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id)
+			}
 			//var duration float32
 			var duration int
 
@@ -222,8 +241,10 @@ func analysis_packet(packet gopacket.Packet) {
 			//return
 			if(duration == 100){
 				logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|100\n",
-					ip.DstIP.String(),
-					ip.SrcIP.String(),
+					//ip.DstIP.String(),
+					//ip.SrcIP.String(),
+					dstip.String(),
+					srcip.String(),
 					//req_time.Format("20060102150405.000000"),
 					//timenow.Format("20060102150405.000000"),
 					req_time.Format("20060102150405.000"),
@@ -238,8 +259,10 @@ func analysis_packet(packet gopacket.Packet) {
 			}else{
 				//logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|%.3f\n",
 				logbuffer.Put(fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%d|%s|%d\n",
-					ip.DstIP.String(),
-					ip.SrcIP.String(),
+					//ip.DstIP.String(),
+					//ip.SrcIP.String(),
+					dstip.String(),
+					srcip.String(),
 					//req_time.Format("20060102150405.000000"),
 					//timenow.Format("20060102150405.000000"),
 					req_time.Format("20060102150405.000"),
@@ -266,8 +289,12 @@ func analysis_packet(packet gopacket.Packet) {
 
 		}else{
 			//a request info should saved into LRU cache
-			requestCache.addRequest(ip.SrcIP, ip.DstIP, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id, msg.Question[0].Qtype, msg.Question[0].Name, timenow)
 			//fmt.Println("get request")
+			if isv6 {
+				requestCache6.addRequest6(srcip, dstip, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id, msg.Question[0].Qtype, msg.Question[0].Name, timenow)
+			}else {
+				requestCache.addRequest(srcip, dstip, (uint16)(udp.SrcPort), (uint16)(udp.DstPort), msg.Id, msg.Question[0].Qtype, msg.Question[0].Name, timenow)
+			}
 		}
 		//for rr := range msg.Answer[] {
 
@@ -325,6 +352,7 @@ func main() {
 	runtime.GOMAXPROCS(processorNumber)
 
 	requestCache.Init(requestCacheSize)
+	requestCache6.Init(requestCacheSize)
 
 	finishedFiles, _ = lru.New(10000)
 
